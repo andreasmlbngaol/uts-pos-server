@@ -8,4 +8,5 @@ object Users: LongIdTable("users") {
     val name = varchar("name", 255)
     val passwordHash = varchar("password_hash", 255)
     val role = enumerationByName<Role>("role", 255)
+    val mustChangePassword = bool("must_change_password")
 }

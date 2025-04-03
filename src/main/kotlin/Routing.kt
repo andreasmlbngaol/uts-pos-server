@@ -1,65 +1,145 @@
 package com.jawa
 
 import com.jawa.dao.UserDao
-import com.jawa.dto.UserRequest
-import com.jawa.service.validName
-import com.jawa.service.validPassword
-import com.jawa.service.validUsername
+import com.jawa.dto.CreateUserRequest
+import com.jawa.dto.UpdateUserRequest
+import com.jawa.service.*
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 
-fun Application.configureRouting() {
+fun Application.configureUserRoute() {
     routing {
         get("/") {
             call.respondText("Hello World!")
         }
 
-        get("/users") {
-            call.respond(UserDao.getAllUsers())
+        route("/users") {
+            get {
+                call.respond(UserDao.getAllUsers())
+            }
+
+            post {
+                val request = try {
+                    call.receive<CreateUserRequest>()
+                } catch (e: Exception) {
+                    call.respond(HttpStatusCode.BadRequest, "Invalid Request")
+                    return@post
+                }
+
+                if(!request.username.isValidUsername()) {
+                    call.respond(HttpStatusCode.BadRequest, "Invalid Username")
+                    return@post
+                }
+
+                if(!request.username.isUsernameAvailable()) {
+                    call.respond(HttpStatusCode.Conflict, "Username is already taken")
+                    return@post
+                }
+
+                if(!request.name.isValidName()) {
+                    call.respond(HttpStatusCode.BadRequest, "Invalid Name")
+                    return@post
+                }
+
+                val otp = PasswordManager.generateOtp()
+
+                UserDao.insertUser(
+                    request = request.copy(username = request.username.lowercase()),
+                    otp = otp
+                )
+                call.respond(HttpStatusCode.Created, mapOf("otp" to otp))
+            }
+
+            route("/{id}") {
+                patch("/name") {
+                    call.extractPatchRequest { id, request ->
+                        request.name?.let { name ->
+                            if(!name.isValidName()) {
+                                call.respond(HttpStatusCode.BadRequest, "Invalid Name Format")
+                                return@extractPatchRequest
+                            }
+
+                            UserDao.updateName(id, name)
+                            call.respond(HttpStatusCode.NoContent, "User Name Updated")
+                        }
+                    }
+                }
+
+                route("/password") {
+                    patch("/reset") {
+                        call.extractPatchRequest { id, request ->
+                            request.resetPassword?.let { resetPassword ->
+                                if (resetPassword) {
+                                    val otp = PasswordManager.generateOtp()
+                                    UserDao.resetPassword(id, otp)
+                                    call.respond(HttpStatusCode.OK, mapOf("otp" to otp))
+                                }
+                            }
+                        }
+                    }
+
+                    patch("/change") {
+                        call.extractPatchRequest { id, request ->
+                            request.newPassword?.let { newPassword ->
+                                if (!newPassword.isValidPassword()) {
+                                    call.respond(HttpStatusCode.BadRequest, "Invalid Password Format")
+                                    return@extractPatchRequest
+                                }
+
+                                UserDao.updatePassword(id, newPassword)
+                                call.respond(HttpStatusCode.NoContent, "Password Updated")
+                            }
+                        }
+                    }
+                }
+
+                patch("/username") {
+                    call.extractPatchRequest { id, request ->
+                        request.username?.let { username ->
+                            if (!username.isUsernameAvailable()) {
+                                call.respond(HttpStatusCode.Conflict, "Username is already taken")
+                                return@extractPatchRequest
+                            }
+
+                            if (!username.isValidUsername()) {
+                                call.respond(HttpStatusCode.BadRequest, "Invalid Name Format")
+                                return@extractPatchRequest
+                            }
+
+                            UserDao.updateUsername(id, username)
+                            call.respond(HttpStatusCode.NoContent, "User Name Updated")
+                        }
+                    }
+                }
+            }
         }
 
-        post("/users") {
-            println("Start")
-            val request = try {
-                println("Received")
-                call.receive<UserRequest>()
-            } catch (e: Exception) {
-                println(e.message)
-                call.respond(HttpStatusCode.BadRequest, "Invalid Request Format")
-                return@post
-            }
-
-            println("request: $request")
-            val username = request.username.lowercase()
-            println("Lowercased")
-
-            if(!username.validUsername()) {
-                println("Error1")
-                call.respond(HttpStatusCode.BadRequest, "Invalid Username Format")
-                return@post
-            }
-
-            if(request.name.validName()) {
-                println("Error1")
-
-                call.respond(HttpStatusCode.BadRequest, "Invalid Name Format")
-                return@post
-            }
-
-            if(request.originalPassword.validPassword()) {
-                println("Error1")
-
-                call.respond(HttpStatusCode.BadRequest, "Invalid Password Format")
-                return@post
-            }
-
-            println("Test")
-
-            UserDao.insertUser(request.copy(username = username.lowercase()))
-            call.respond(HttpStatusCode.Created)
-        }
     }
+}
+
+suspend fun RoutingCall.extractPatchRequest(
+    onExtract: suspend (Long, UpdateUserRequest) -> Unit
+) {
+    val id = this.parameters["id"]?.toLongOrNull()
+    if(id == null) {
+        this.respond(HttpStatusCode.BadRequest, "Invalid Id Format. ID is null")
+        return
+    }
+
+    if(UserDao.getUserById(id) == null) {
+        this.respond(HttpStatusCode.NotFound, "User with ID $id does not exist")
+        return
+    }
+
+    val request = try {
+        this.receive<UpdateUserRequest>()
+    } catch (e: Exception) {
+        this.respond(HttpStatusCode.BadRequest, "Invalid Request Format")
+        return
+    }
+
+    onExtract(id, request)
 }

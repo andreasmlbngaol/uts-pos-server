@@ -3,19 +3,22 @@ package com.jawa.service
 import com.jawa.dao.UserDao
 
 object UserRequestManager {
-    suspend fun isUsernameValid(username: String): Boolean {
-        val isFormatValid = username.matches("^(?!\\.)([a-z0-9_]+(\\.[a-z0-9_]+)*){6,}(?!\\.)$".toRegex())
-        val isAvailable = UserDao.getUserByUsername(username) == null
-        return isFormatValid && isAvailable
+    suspend fun isUsernameAvailable(username: String): Boolean {
+        return UserDao.getUserByUsername(username.lowercase()) == null
+    }
+
+    fun isUsernameValid(username: String): Boolean {
+        return username.lowercase().matches("^(?!\\.)([a-z0-9_]+(\\.[a-z0-9_]+)*){6,}(?!\\.)$".toRegex())
     }
 
     fun isNameValid(name: String): Boolean =
-        name.isBlank()
+        name.isNotBlank()
 
     fun isPasswordValid(password: String): Boolean =
-        password.isBlank()
+        password.isNotBlank()
 }
 
-suspend fun String.validUsername() = UserRequestManager.isUsernameValid(this)
-fun String.validName() = UserRequestManager.isNameValid(this)
-fun String.validPassword() = UserRequestManager.isPasswordValid(this)
+suspend fun String.isUsernameAvailable() = UserRequestManager.isUsernameAvailable(this)
+fun String.isValidUsername() = UserRequestManager.isUsernameValid(this)
+fun String.isValidName() = UserRequestManager.isNameValid(this)
+fun String.isValidPassword() = UserRequestManager.isPasswordValid(this)
