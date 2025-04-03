@@ -1,0 +1,11 @@
+ktor:
+  application:
+    modules:
+      - com.jawa.ApplicationKt.module
+  deployment:
+    port: 8080
+    host: 0.0.0.0
+postgres:
+  url: "jdbc:postgresql://localhost/$DB_NAME"
+  user: "$USERNAME"
+  password: "$PASSWORD"
