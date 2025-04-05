@@ -11,7 +11,7 @@ object PasswordManager {
         BCrypt.withDefaults().hashToString(SALT_LENGTH, realPassword.toCharArray())
 
     fun verifyPassword(inputPassword: String, hashedPassword: String): Boolean =
-        BCrypt.verifyer().verify(hashedPassword.toCharArray(), inputPassword.toCharArray()).verified
+        BCrypt.verifyer().verify(inputPassword.toCharArray(), hashedPassword.toCharArray()).verified
 
     fun generateOtp(): String {
         val characters = "abcdefghijklmnopqrstuvwxyz"

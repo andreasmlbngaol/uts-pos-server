@@ -34,7 +34,6 @@ object UserDao {
             .selectAll()
             .where { Users.username eq username }
             .singleOrNull()
-            ?.toUser()
     }
 
     suspend fun getUserById(id: Long) = newSuspendedTransaction(Dispatchers.IO) {

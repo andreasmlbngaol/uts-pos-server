@@ -4,11 +4,12 @@ import com.jawa.entities.Products
 import com.jawa.entities.TransactionDetails
 import com.jawa.entities.Transactions
 import com.jawa.entities.Users
+import com.jawa.enums.Role
+import com.jawa.service.hashed
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import io.ktor.server.config.*
-import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.SchemaUtils
+import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.sql.Connection
@@ -16,10 +17,10 @@ import java.sql.Connection
 object DatabaseFactory {
     fun init(config: ApplicationConfig) {
         val hikariConfig = HikariConfig().apply {
-            jdbcUrl = config.propertyOrNull("postgres.url")?.getString()
-            driverClassName = config.propertyOrNull("postgres.driver")?.getString()
-            username = config.propertyOrNull("postgres.username")?.getString()
-            password = config.propertyOrNull("postgres.password")?.getString()
+            jdbcUrl = config.propertyOrNull("postgres.url")?.getString() ?: "jdbc:postgresql://localhost:5432/uts_pos_db"
+            driverClassName = config.propertyOrNull("postgres.driver")?.getString() ?: "org.postgresql.Driver"
+            username = config.propertyOrNull("postgres.username")?.getString() ?: "andre"
+            password = config.propertyOrNull("postgres.password")?.getString() ?: "150503"
             maximumPoolSize = 5
             isAutoCommit = false
             transactionIsolation = "TRANSACTION_REPEATABLE_READ"
@@ -36,7 +37,14 @@ object DatabaseFactory {
                 Transactions,
                 TransactionDetails
             )
-        }
 
+            Users.insertIgnore {
+                it[username] = "andreasmlbngaol"
+                it[name] = "Andreas M Lbn Gaol"
+                it[passwordHash] = "password".hashed()
+                it[role] = Role.ADMIN
+                it[mustChangePassword] = false
+            }
+        }
     }
 }

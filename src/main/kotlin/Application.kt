@@ -12,5 +12,6 @@ fun Application.module() {
     DatabaseFactory.init(environment.config)
 
     configureSerialization()
+    configureSession()
     configureUserRoute()
 }

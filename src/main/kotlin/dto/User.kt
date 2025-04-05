@@ -10,7 +10,8 @@ data class User(
     val id: Long,
     val username: String,
     val name: String,
-    val role: Role
+    val role: Role,
+    val mustChangePassword: Boolean
 )
 
 @Serializable
@@ -33,6 +34,7 @@ fun ResultRow.toUser(): User {
         id = this[Users.id].value,
         username = this[Users.username],
         name = this[Users.name],
-        role = this[Users.role]
+        role = this[Users.role],
+        mustChangePassword = this[Users.mustChangePassword]
     )
 }
