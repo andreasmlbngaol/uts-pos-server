@@ -1,9 +1,6 @@
 package com.jawa.db
 
-import com.jawa.entities.Products
-import com.jawa.entities.TransactionDetails
-import com.jawa.entities.Transactions
-import com.jawa.entities.Users
+import com.jawa.entities.*
 import com.jawa.enums.Role
 import com.jawa.service.hashed
 import com.zaxxer.hikari.HikariConfig
@@ -35,7 +32,8 @@ object DatabaseFactory {
                 Users,
                 Products,
                 Transactions,
-                TransactionDetails
+                TransactionDetails,
+                UserSessions
             )
 
             Users.insertIgnore {

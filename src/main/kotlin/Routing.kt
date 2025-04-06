@@ -1,6 +1,7 @@
 package com.jawa
 
 import com.jawa.dao.UserDao
+import com.jawa.dao.UserDao.toUser
 import com.jawa.dto.CreateUserRequest
 import com.jawa.dto.UpdateUserRequest
 import com.jawa.service.*
@@ -20,30 +21,19 @@ fun Application.configureUserRoute() {
                 get { call.respond(HttpStatusCode.OK, UserDao.getAllUsers()) }
 
                 post {
-                    val request = try {
-                        call.receive<CreateUserRequest>()
-                    } catch (e: Exception) {
-                        call.respond(HttpStatusCode.BadRequest, "Invalid Request")
-                        return@post
-                    }
+                    val request = runCatching { call.receive<CreateUserRequest>() }
+                        .getOrElse {
+                            call.respond(HttpStatusCode.BadRequest, "Invalid Request")
+                            return@post
+                        }
 
-                    if (!request.username.isValidUsername()) {
-                        call.respond(HttpStatusCode.BadRequest, "Invalid Username")
-                        return@post
-                    }
-
-                    if (!request.username.isUsernameAvailable()) {
-                        call.respond(HttpStatusCode.Conflict, "Username is already taken")
-                        return@post
-                    }
-
-                    if (!request.name.isValidName()) {
-                        call.respond(HttpStatusCode.BadRequest, "Invalid Name")
-                        return@post
+                    when {
+                        !request.username.isValidUsername() -> return@post call.respond(HttpStatusCode.BadRequest, "Invalid Username")
+                        !request.username.isUsernameAvailable() -> return@post call.respond(HttpStatusCode.Conflict, "Username is already taken")
+                        !request.name.isValidName() -> return@post call.respond(HttpStatusCode.BadRequest, "Invalid Name")
                     }
 
                     val otp = PasswordManager.generateOtp()
-
                     UserDao.insertUser(
                         request = request.copy(username = request.username.lowercase()),
                         otp = otp
@@ -53,32 +43,19 @@ fun Application.configureUserRoute() {
 
                 route("/{id}") {
                     get {
-                        val id = call.parameters["id"]?.toLongOrNull()
-                        if(id == null) {
-                            call.respond(HttpStatusCode.BadRequest, "Invalid Id")
-                            return@get
-                        }
-
-                        val user = UserDao.getUserById(id)
-                        if(user == null) {
-                            call.respond(HttpStatusCode.NotFound, "User with id $id does not exist")
-                            return@get
-                        }
-
+                        val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest, "Invalid Id Format")
+                        val user = UserDao.getUserById(id)?.toUser() ?: return@get call.respond(HttpStatusCode.NotFound, "User not found")
                         call.respond(HttpStatusCode.OK, user)
                     }
 
                     patch("/name") {
-                        call.extractPatchRequest { id, request ->
-                            request.name?.let { name ->
-                                if (!name.isValidName()) {
-                                    call.respond(HttpStatusCode.BadRequest, "Invalid Name Format")
-                                    return@extractPatchRequest
-                                }
+                        call.extractPatchRequest { id, updateRequest ->
+                            updateRequest.name?.let { name ->
+                                if (!name.isValidName()) return@extractPatchRequest call.respond(HttpStatusCode.BadRequest, "Invalid Name Format")
 
                                 UserDao.updateName(id, name)
-                                call.respond(HttpStatusCode.NoContent, "User Name Updated")
-                            }
+                                call.respond(HttpStatusCode.NoContent, "Name updated")
+                            } ?: call.respond(HttpStatusCode.BadRequest, "No Name Provided")
                         }
                     }
 
@@ -91,20 +68,24 @@ fun Application.configureUserRoute() {
                                         UserDao.resetPassword(id, otp)
                                         call.respond(HttpStatusCode.OK, mapOf("otp" to otp))
                                     }
-                                }
+                                } ?: call.respond(HttpStatusCode.BadRequest, "Invalid Reset Password Request Format")
                             }
                         }
 
                         patch("/change") {
                             call.extractPatchRequest { id, request ->
-                                request.newPassword?.let { newPassword ->
-                                    if (!newPassword.isValidPassword()) {
-                                        call.respond(HttpStatusCode.BadRequest, "Invalid Password Format")
-                                        return@extractPatchRequest
-                                    }
+                                val newPassword = request.newPassword
+                                val oldPassword = request.oldPassword
 
+                                when {
+                                    oldPassword == null || newPassword == null -> return@extractPatchRequest call.respond(HttpStatusCode.BadRequest, "Old and new password required")
+                                    !newPassword.isValidPassword() -> return@extractPatchRequest call.respond(HttpStatusCode.BadRequest, "Invalid password format")
+                                    !UserDao.verifyPassword(id, oldPassword) -> return@extractPatchRequest call.respond(HttpStatusCode.Unauthorized, "Incorrect old password")
+                                }
+
+                                newPassword?.let {
                                     UserDao.updatePassword(id, newPassword)
-                                    call.respond(HttpStatusCode.NoContent, "Password Updated")
+                                    call.respond(HttpStatusCode.NoContent, "Password updated")
                                 }
                             }
                         }
@@ -113,18 +94,11 @@ fun Application.configureUserRoute() {
                     patch("/username") {
                         call.extractPatchRequest { id, request ->
                             request.username?.let { username ->
-                                if (!username.isUsernameAvailable()) {
-                                    call.respond(HttpStatusCode.Conflict, "Username is already taken")
-                                    return@extractPatchRequest
-                                }
-
-                                if (!username.isValidUsername()) {
-                                    call.respond(HttpStatusCode.BadRequest, "Invalid Name Format")
-                                    return@extractPatchRequest
-                                }
+                                if (!username.isUsernameAvailable()) return@extractPatchRequest call.respond(HttpStatusCode.Conflict, "Username is already taken")
+                                if (!username.isValidUsername()) return@extractPatchRequest call.respond(HttpStatusCode.BadRequest, "Invalid Name Format")
 
                                 UserDao.updateUsername(id, username)
-                                call.respond(HttpStatusCode.NoContent, "User Name Updated")
+                                call.respond(HttpStatusCode.NoContent, "Username updated")
                             }
                         }
                     }
@@ -135,25 +109,16 @@ fun Application.configureUserRoute() {
 }
 
 suspend fun RoutingCall.extractPatchRequest(
-    onExtract: suspend (Long, UpdateUserRequest) -> Unit
+    block: suspend (Long, UpdateUserRequest) -> Unit
 ) {
     val id = this.parameters["id"]?.toLongOrNull()
-    if(id == null) {
-        this.respond(HttpStatusCode.BadRequest, "Invalid Id Format. ID is null")
-        return
-    }
+        ?: return this.respond(HttpStatusCode.BadRequest, "Invalid Id Format. ID is null")
 
-    if(UserDao.getUserById(id) == null) {
-        this.respond(HttpStatusCode.NotFound, "User with ID $id does not exist")
-        return
-    }
+    if(UserDao.getUserById(id) == null)
+        return this.respond(HttpStatusCode.NotFound, "User not found")
 
-    val request = try {
-        this.receive<UpdateUserRequest>()
-    } catch (e: Exception) {
-        this.respond(HttpStatusCode.BadRequest, "Invalid Request Format")
-        return
-    }
+    val request = runCatching { this.receive<UpdateUserRequest>() }
+        .getOrElse { return this.respond(HttpStatusCode.BadRequest, "Invalid Id") }
 
-    onExtract(id, request)
+    block(id, request)
 }

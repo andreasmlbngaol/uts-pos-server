@@ -1,15 +1,13 @@
 package com.jawa.dao
 
 import com.jawa.dto.CreateUserRequest
-import com.jawa.dto.toUser
+import com.jawa.dto.User
 import com.jawa.entities.Users
+import com.jawa.service.PasswordManager
 import com.jawa.service.hashed
 import kotlinx.coroutines.Dispatchers
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
-import org.jetbrains.exposed.sql.update
 
 object UserDao {
     suspend fun getAllUsers() = newSuspendedTransaction(Dispatchers.IO) {
@@ -29,6 +27,7 @@ object UserDao {
         }
     }
 
+
     suspend fun getUserByUsername(username: String) = newSuspendedTransaction(Dispatchers.IO) {
         Users
             .selectAll()
@@ -41,7 +40,6 @@ object UserDao {
             .selectAll()
             .where { Users.id eq id }
             .singleOrNull()
-            ?.toUser()
     }
 
     suspend fun updateUsername(id: Long, newUsername: String) = newSuspendedTransaction(Dispatchers.IO) {
@@ -75,6 +73,21 @@ object UserDao {
                 it[passwordHash] = newPassword.hashed()
                 it[mustChangePassword] = false
             }
+        )
+    }
+
+    suspend fun verifyPassword(id: Long, inputPassword: String): Boolean {
+        val user = getUserById(id) ?: return false
+        return PasswordManager.verifyPassword(inputPassword, user[Users.passwordHash])
+    }
+
+    fun ResultRow.toUser(): User {
+        return User(
+            id = this[Users.id].value,
+            username = this[Users.username],
+            name = this[Users.name],
+            role = this[Users.role],
+            mustChangePassword = this[Users.mustChangePassword]
         )
     }
 }
