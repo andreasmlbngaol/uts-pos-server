@@ -3,12 +3,12 @@ package com.jawa
 import com.jawa.auth.SESSION_TIMEOUT_IN_SECONDS
 import com.jawa.dao.UserSessionDao
 import com.jawa.db.DatabaseFactory
+import com.jawa.routes.apiRoutes
+import com.jawa.routes.installPlugins
 import io.ktor.server.application.*
 import io.ktor.server.netty.EngineMain
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import io.ktor.server.routing.*
+import kotlinx.coroutines.*
 import kotlin.time.DurationUnit
 import kotlin.time.toDuration
 
@@ -20,17 +20,19 @@ fun Application.module() {
     DatabaseFactory.init(environment.config)
     startSessionCleanupJob()
 
-    configureSerialization()
-    configureSession()
-    configureUserRoute()
+    installPlugins()
+    routing { apiRoutes() }
 }
 
-@OptIn(DelicateCoroutinesApi::class)
-fun startSessionCleanupJob() {
-    GlobalScope.launch {
-        while (true) {
+fun Application.startSessionCleanupJob() {
+    val job = CoroutineScope(Dispatchers.IO).launch {
+        while (isActive) {
             delay(SESSION_TIMEOUT_IN_SECONDS.toDuration(DurationUnit.SECONDS))
             UserSessionDao.deleteExpiredSessions()
         }
+    }
+
+    monitor.subscribe(ApplicationStopped) {
+        job.cancel()
     }
 }

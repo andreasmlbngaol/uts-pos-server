@@ -13,36 +13,45 @@ import java.sql.Connection
 
 object DatabaseFactory {
     fun init(config: ApplicationConfig) {
-        val hikariConfig = HikariConfig().apply {
-            jdbcUrl = config.propertyOrNull("postgres.url")?.getString() ?: "jdbc:postgresql://localhost:5432/uts_pos_db"
-            driverClassName = config.propertyOrNull("postgres.driver")?.getString() ?: "org.postgresql.Driver"
-            username = config.propertyOrNull("postgres.username")?.getString() ?: "andre"
-            password = config.propertyOrNull("postgres.password")?.getString() ?: "150503"
+        val hikariConfig = configureDatabase(config)
+        Database.connect(HikariDataSource(hikariConfig))
+        TransactionManager.manager.defaultIsolationLevel = Connection.TRANSACTION_REPEATABLE_READ
+
+        transaction {
+            createTables()
+            insertAdmin()
+        }
+    }
+
+    private fun configureDatabase(config: ApplicationConfig): HikariConfig {
+        return HikariConfig().apply {
+            jdbcUrl = config.propertyOrNull("postgres.url")?.getString()
+            driverClassName = config.propertyOrNull("postgres.driver")?.getString()
+            username = config.propertyOrNull("postgres.username")?.getString()
+            password = config.propertyOrNull("postgres.password")?.getString()
             maximumPoolSize = 5
             isAutoCommit = false
             transactionIsolation = "TRANSACTION_REPEATABLE_READ"
         }
+    }
 
-        Database.connect(HikariDataSource(hikariConfig))
+    private fun createTables() {
+        SchemaUtils.create(
+            Users,
+            Products,
+            Transactions,
+            TransactionDetails,
+            UserSessions
+        )
+    }
 
-        TransactionManager.manager.defaultIsolationLevel = Connection.TRANSACTION_REPEATABLE_READ
-
-        transaction {
-            SchemaUtils.create(
-                Users,
-                Products,
-                Transactions,
-                TransactionDetails,
-                UserSessions
-            )
-
-            Users.insertIgnore {
-                it[username] = "andreasmlbngaol"
-                it[name] = "Andreas M Lbn Gaol"
-                it[passwordHash] = "password".hashed()
-                it[role] = Role.ADMIN
-                it[mustChangePassword] = false
-            }
+    private fun insertAdmin() {
+        Users.insertIgnore {
+            it[username] = "andreasmlbngaol"
+            it[name] = "Andreas M Lbn Gaol"
+            it[passwordHash] = "password".hashed()
+            it[role] = Role.ADMIN
+            it[mustChangePassword] = false
         }
     }
 }
