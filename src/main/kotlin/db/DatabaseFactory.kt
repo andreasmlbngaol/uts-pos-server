@@ -19,7 +19,7 @@ object DatabaseFactory {
 
         transaction {
             createTables()
-            insertAdmin()
+            insertAdmin(config)
         }
     }
 
@@ -45,11 +45,11 @@ object DatabaseFactory {
         )
     }
 
-    private fun insertAdmin() {
+    private fun insertAdmin(config: ApplicationConfig) {
         Users.insertIgnore {
-            it[username] = "andreasmlbngaol"
-            it[name] = "Andreas M Lbn Gaol"
-            it[passwordHash] = "password".hashed()
+            it[username] = config.propertyOrNull("admin.username")?.getString() ?: "admin"
+            it[name] = config.propertyOrNull("admin.name")?.getString() ?: "Admin"
+            it[passwordHash] = (config.propertyOrNull("admin.password")?.getString() ?: "password").hashed()
             it[role] = Role.ADMIN
             it[mustChangePassword] = false
         }
