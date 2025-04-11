@@ -33,9 +33,10 @@
     ```postgresql
     CREATE DATABASE db_name;
     ```
-2. Modify [**application.example.yaml**](src/main/resources/application.example.yaml) in `/src/main/resources/` with your own database configuration (DATABASE_NAME, USERNAME, PASSWORD) and rename the file name to **application.yaml**
-    ![modify_conf](docs/modify_conf.png)
-3. Modify the `insertAdmin()` functions in [**DatabaseFactory.kt**](src/main/kotlin/db/DatabaseFactory.kt) in `src/main/kotlin/db/` to create the default data of the admin you'll use to sign in
-    ![modify_admin](docs/modify_admin.png)
-4. Run server
+2. Modify [**application.example.yaml**](src/main/resources/application.example.yaml) in `/src/main/resources/` with your own database configuration (DATABASE_NAME, USERNAME, PASSWORD)
+    ![modify_conf](docs/modify_db.png)
+3. Modify [**application.example.yaml**](src/main/resources/application.example.yaml) in `/src/main/resources/` with your own default admin configuration (USERNAME, NAME, PASSWORD)
+   ![modify_conf](docs/modify_admin.png)
+4. Rename the file name [**application.example.yaml**](src/main/resources/application.example.yaml) to **application.yaml** 
+5. Run server
 5. Run **[client application](https://github.com/andreasmlbngaol/uts-pos-client)**

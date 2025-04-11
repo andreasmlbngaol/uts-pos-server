@@ -10,3 +10,7 @@ postgres:
   driver: "org.postgresql.Driver"
   username: "$USERNAME"
   password: "$PASSWORD"
+admin:
+  username: "$ADMIN_USERNAME"
+  name: "$ADMIN_NAME"
+  password: "$ADMIN_PASSWORD"
