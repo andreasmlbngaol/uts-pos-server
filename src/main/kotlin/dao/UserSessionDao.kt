@@ -3,6 +3,7 @@ package com.jawa.dao
 import com.jawa.auth.UserSession
 import com.jawa.entities.UserSessions
 import kotlinx.coroutines.Dispatchers
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.lessEq
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
@@ -35,5 +36,10 @@ object UserSessionDao {
                 UserSessions.expiredAt greaterEq System.currentTimeMillis()
             }
             .singleOrNull()
+    }
+
+    suspend fun deleteSession(token: String) = newSuspendedTransaction(Dispatchers.IO) {
+        UserSessions
+            .deleteWhere { UserSessions.token eq token }
     }
 }

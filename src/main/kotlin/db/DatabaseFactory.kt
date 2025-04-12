@@ -20,6 +20,7 @@ object DatabaseFactory {
         transaction {
             createTables()
             insertAdmin(config)
+            insertCashier()
         }
     }
 
@@ -52,6 +53,17 @@ object DatabaseFactory {
             it[passwordHash] = (config.propertyOrNull("admin.password")?.getString() ?: "password").hashed()
             it[role] = Role.ADMIN
             it[mustChangePassword] = false
+        }
+    }
+
+    // Test
+    private fun insertCashier() {
+        Users.insertIgnore {
+            it[username] = "cashier"
+            it[name] = "Cashier"
+            it[passwordHash] = "password".hashed()
+            it[role] = Role.CASHIER
+            it[mustChangePassword] = true
         }
     }
 }
